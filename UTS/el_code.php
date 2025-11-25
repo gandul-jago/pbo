@@ -58,23 +58,40 @@ class Pajak {
     }
 
     public function hitungPPhPerLapisan($pkp) {
-        $remaining = $pkp;
+        $remaining = max(0, (float)$pkp);
         $result = [];
         $lower = 0;
+
         foreach ($this->brackets as $upper => $rate) {
             if ($remaining <= 0) break;
-            $cap = $upper - $lower;
+
+            // pastikan $upper sebagai integer (PHP_INT_MAX akan tetap besar)
+            $upperInt = (int)$upper;
+            $cap = $upperInt - $lower;
             $take = min($cap, $remaining);
             $tax = $take * $rate;
+
+            // format text range — untuk lapisan terakhir tampilkan "> <lower+1>"
+            if ($upperInt === PHP_INT_MAX) {
+                $rangeText = '> ' . number_format($lower + 1, 0, ',', '.');
+            } else {
+                $rangeText =
+                    number_format($lower + 1, 0, ',', '.') .
+                    ' - ' .
+                    number_format($upperInt, 0, ',', '.');
+            }
+
             $result[] = [
-                'range' => ($lower + 1) . ' - ' . $upper,
+                'range' => $rangeText,
                 'amount' => $take,
                 'rate' => $rate,
                 'tax' => $tax
             ];
+
             $remaining -= $take;
-            $lower = $upper;
+            $lower = $upperInt;
         }
+
         return $result;
     }
 
@@ -139,8 +156,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['clear_form'])) {
         label{ display:block; margin-bottom:4px; }
         input[type=text], input[type=number]{ width:320px; padding:6px; font-size:14px; }
         .money { text-align:left; }
-        table{ border-collapse: collapse; margin-top:10px; }
-        table, th, td{ border:1px solid #333; padding:6px; }
+        table{ border-collapse: collapse; margin-top:10px; width:100%; max-width:800px; }
+        table, th, td{ border:1px solid #333; padding:6px; text-align:left; }
+        th { background:#f3f3f3; }
         .actions { margin-top:18px; }
         .actions button { padding:8px 12px; margin-right:8px; }
     </style>
@@ -187,7 +205,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['clear_form'])) {
 
         <div class="actions">
             <button type="submit">Hitung Pajak</button>
-            <!-- tombol hapus mengirim flag clear_form supaya server juga tidak memproses -->
             <button type="button" id="btnClear">Hapus</button>
         </div>
     </form>
@@ -237,7 +254,6 @@ function prepareSubmit(){
     }
 }
 
-
 document.getElementById('btnClear').addEventListener('click', function(){
     document.querySelector('input[name="nama"]').value = '';
     document.querySelector('input[name="status_kawin"][value="tidak"]').checked = true;
@@ -250,6 +266,7 @@ document.getElementById('btnClear').addEventListener('click', function(){
     document.getElementById('tunjangan_raw').value = 0;
     document.getElementById('iuran_raw').value = 0;
 
+    // reload halaman agar hasil di-server hilang
     window.location.href = window.location.pathname;
 });
 </script>
